@@ -1,0 +1,135 @@
+# ==========================================================
+# كود الدرجات الإضافية (Bonus Opportunities +5 Marks)
+# مشروع تصنيف الأرقام - اسم الطالب: عبد الرحمن إبراهيم كريري
+# ==========================================================
+
+import os
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from PIL import Image
+
+print("==================================================")
+print("     بدء تنفيذ مهام الدرجات الإضافية (+5 درجات)     ")
+print("==================================================")
+
+# تثبيت عشوائي لضمان تكرار النتائج
+np.random.seed(42)
+tf.random.set_seed(42)
+
+# تحميل البيانات وتجهيزها بسرعة مجدداً
+(X_full, y_full), (X_test, y_test) = keras.datasets.mnist.load_data()
+X_full, X_test = X_full / 255.0, X_test / 255.0
+X_full, X_test = X_full[..., None], X_test[..., None]
+X_val, y_val = X_full[:6000], y_full[:6000]
+X_train, y_train = X_full[6000:], y_full[6000:]
+
+# ----------------------------------------------------------
+# المقارنة الإضافية 1: بناء موديل مع زيادة البيانات (Data Augmentation)
+# ----------------------------------------------------------
+# هنا نقوم بتعليم الموديل عبر تدوير الصور وإزاحتها خفيفاً لكي يصبح أذكى ولا يحفظ الأشكال
+data_augmentation = keras.Sequential([
+    layers.RandomRotation(0.05, input_shape=(28, 28, 1)), # تدوير خفيف 5%
+    layers.RandomTranslation(height_factor=0.05, width_factor=0.05) # إزاحة خفيفة 5%
+])
+
+# بناء موديل جديد مضاف له طبقة زيادة البيانات
+model_augmented = keras.Sequential([
+    data_augmentation,
+    layers.Conv2D(32, 3, activation="relu"),
+    layers.MaxPooling2D(),
+    layers.Conv2D(64, 3, activation="relu"),
+    layers.MaxPooling2D(),
+    layers.Flatten(),
+    layers.Dense(64, activation="relu"),
+    layers.Dense(10, activation="softmax")
+])
+
+model_augmented.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+
+print("\n[تنبيه] جاري تدريب الموديل الجديد مع (Data Augmentation) للمقارنة...")
+history_aug = model_augmented.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=3, batch_size=32, verbose=1)
+
+# ----------------------------------------------------------
+# المهمة الإضافية 2: بناء لوحة تحكم (Dashboard) تحتوي على 4 رسومات في شكل واحد
+# ----------------------------------------------------------
+print("\n[معلومات] جاري تصميم لوحة التحكم (Dashboard) بـ 4 رسومات بيانية...")
+
+# إنشاء لوحة بمقاس 2×2 (تتسع لـ 4 رسومات)
+fig, axs = plt.subplots(2, 2, figsize=(14, 12))
+
+# الرسمة 1: دقة التدريب والتحقق للموديل المعدل
+axs[0, 0].plot(history_aug.history['accuracy'], label='Train Accuracy', color='blue', marker='o')
+axs[0, 0].plot(history_aug.history['val_accuracy'], label='Val Accuracy', color='orange', marker='x')
+axs[0, 0].set_title('1. Model Accuracy (With Augmentation)')
+axs[0, 0].set_xlabel('Epochs')
+axs[0, 0].set_ylabel('Accuracy')
+axs[0, 0].legend()
+axs[0, 0].grid(True)
+
+# الرسمة 2: نسبة الخسارة (Loss) للموديل المعدل
+axs[0, 1].plot(history_aug.history['loss'], label='Train Loss', color='red', linestyle='--')
+axs[0, 1].plot(history_aug.history['val_loss'], label='Val Loss', color='green', linestyle=':')
+axs[0, 1].set_title('2. Model Loss (With Augmentation)')
+axs[0, 1].set_xlabel('Epochs')
+axs[0, 1].set_ylabel('Loss')
+axs[0, 1].legend()
+axs[0, 1].grid(True)
+
+# الرسمة 3: استعراض عينات من الصور بعد التدوير والإزاحة (Data Augmentation Preview)
+augmented_images = data_augmentation(X_train[:1])
+axs[1, 0].imshow(augmented_images[0].numpy().reshape(28, 28), cmap='gray')
+axs[1, 0].set_title('3. Sample of Augmented Image (Rotated/Shifted)')
+axs[1, 0].axis('off')
+
+# الرسمة 4: مصفوفة اللخبطة (Confusion Matrix) للموديل على بيانات الفحص
+y_pred_aug = np.argmax(model_augmented.predict(X_test), axis=1)
+cm = confusion_matrix(y_test, y_pred_aug)
+disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=list(range(10)))
+disp.plot(ax=axs[1, 1], cmap=plt.cm.Blues, values_format='d')
+axs[1, 1].set_title('4. Confusion Matrix (Final Test Set)')
+
+# حفظ لوحة التحكم كاملة كصورة واحدة
+plt.tight_layout()
+plt.savefig("mnist_dashboard_4_charts.png", dpi=300)
+plt.show()
+print("[نجاح] تم عرض وحفظ لوحة التحكم المكونة من 4 رسومات باسم: mnist_dashboard_4_charts.png")
+
+# ----------------------------------------------------------
+# المهمة الإضافية 3: كود جاهز لاختبار رقم مكتوب بخط يدك يدوياً
+# ----------------------------------------------------------
+print("\n" + "="*50)
+print(" 📝 خطوة اختبار صورتك الخاصة (Handwritten Digit Photo)")
+print("="*50)
+print("تعليمات لك يا عبد الرحمن:")
+print("1. اكتب أي رقم (مثلاً 5 أو 7) بقلم أسود عريض في ورقة بيضاء.")
+print("2. صوّر الورقة بجوالك وارفع الصورة في كولاب بنفس المجلد.")
+print("3. غيّر الاسم في السطر بالأسفل ليتطابق مع اسم صورتك وشغّل هذا الجزء.")
+
+IMAGE_NAME = "my_digit.png" # اسم صورتك المرفوعة
+
+if os.path.exists(IMAGE_NAME):
+    # قراءة الصورة وتحويلها للأبيض والأسود (Grayscale) وتصغير حجمها لـ 28x28 بكسل لتطابق الموديل
+    img = Image.open(IMAGE_NAME).convert('L').resize((28, 28))
+    img_array = np.array(img)
+    
+    # تحويل الصورة لتكون بخلفية سوداء والرقم بالأبيض (لأن بيانات الموديل تدربت هكذا)
+    if img_array[0, 0] > 128: 
+        img_array = 255 - img_array
+        
+    img_array = img_array / 255.0  # تحجيم البكسلات
+    img_input = img_array.reshape(1, 28, 28, 1) # إعادة ضبط الأبعاد للموديل
+    
+    # التنبؤ بالرقم المكتوب
+    custom_pred = np.argmax(model_augmented.predict(img_input), axis=1)
+    
+    # عرض الصورة والنتيجة التوقعية
+    plt.imshow(img_array, cmap='gray')
+    plt.title(f"🎉 الموديل يتوقع أن هذا الرقم هو: {custom_pred[0]}", fontsize=14, color='green')
+    plt.axis('off')
+    plt.show()
+else:
+    print(f"[تنبيه] لم نجد ملف الصورة '{IMAGE_NAME}' حتى الآن. ارفع صورتك لتجربة الميزة الإضافية رقم 3!")
