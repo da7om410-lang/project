@@ -1,0 +1,95 @@
+# ==========================================
+# المرحلة الثانية لتايتانيك: تجهيز بيانات كاجل وتدريب النموذج
+# اسم الملف المرجعي: 01_train.ipynb
+# ==========================================
+
+# استيراد المكتبات الأساسية
+import os  # للتعامل مع الملفات والمسارات
+import numpy as np  # للعمليات الرياضية
+import pandas as pd  # لمعالجة البيانات
+import joblib  # لحفظ النموذج بعد التدريب
+from sklearn.ensemble import RandomForestClassifier  # نموذج الغابة العشوائية
+from sklearn.preprocessing import LabelEncoder  # لتحويل النصوص إلى أرقام
+from sklearn.model_selection import train_test_split  # لتقسيم البيانات
+
+# طباعة عنوان المرحلة
+print("==================================================")
+print("   المرحلة الثانية لتايتانيك: بناء وتدريب الموديل   ")
+print("==================================================")
+
+# 1. تثبيت الرقم العشوائي لضمان نفس النتائج في كل تشغيل
+RANDOM_STATE = 42
+np.random.seed(RANDOM_STATE)
+
+# 2. تحميل بيانات التدريب من ملف كاجل
+file_name = "train.csv"
+
+# التحقق من وجود الملف
+if not os.path.exists(file_name):
+    raise FileNotFoundError(f"خطأ: لم نجد ملف البيانات '{file_name}' في المجلد. تأكد من رفعه بشكل صحيح.")
+
+# قراءة البيانات باستخدام pandas
+df = pd.read_csv(file_name)
+print(f"[نجاح] تم تحميل البيانات. عدد الركاب: {df.shape[0]}")
+
+# 3. تنظيف البيانات (معالجة القيم المفقودة)
+
+# تعويض الأعمار الناقصة بالوسيط (Median)
+df['Age'].fillna(df['Age'].median(), inplace=True)
+
+# تعويض ميناء الصعود بالقيمة الأكثر تكراراً
+df['Embarked'].fillna(df['Embarked'].mode()[0], inplace=True)
+
+# تعويض أسعار التذاكر الناقصة (إن وجدت)
+df['Fare'].fillna(df['Fare'].median(), inplace=True)
+
+# 4. تحويل البيانات النصية إلى أرقام
+
+# تحويل الجنس (ذكر/أنثى) إلى أرقام
+df['Sex'] = LabelEncoder().fit_transform(df['Sex'])
+
+# تحويل ميناء الصعود إلى أرقام
+df['Embarked'] = LabelEncoder().fit_transform(df['Embarked'])
+
+# تحديد الأعمدة المستخدمة كمدخلات (Features)
+features = ['Pclass', 'Sex', 'Age', 'SibSp', 'Parch', 'Fare', 'Embarked']
+
+# X = البيانات المدخلة، y = الهدف (هل نجا أم لا)
+X = df[features]
+y = df['Survived']
+
+# 5. تقسيم البيانات إلى تدريب واختبار
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y,
+    test_size=0.20,          # 20% للاختبار
+    random_state=RANDOM_STATE,
+    stratify=y               # للحفاظ على نفس توزيع الفئات
+)
+
+print(f"[نجاح] تم تقسيم البيانات:")
+print(f"       - عدد بيانات التدريب: {X_train.shape[0]}")
+
+# 6. إنشاء وتدريب نموذج Random Forest
+print("\n[معلومات] بدء تدريب النموذج...")
+
+model = RandomForestClassifier(
+    n_estimators=100,  # عدد الأشجار
+    max_depth=6,       # أقصى عمق لكل شجرة
+    random_state=RANDOM_STATE
+)
+
+# تدريب النموذج على البيانات
+model.fit(X_train, y_train)
+
+print("[نجاح] تم تدريب النموذج بنجاح!")
+
+# 7. حفظ النموذج لاستخدامه لاحقاً
+os.makedirs("models", exist_ok=True)
+joblib.dump(model, "models/titanic_rf_model.pkl")
+
+print("[نجاح] تم حفظ النموذج في المسار: models/titanic_rf_model.pkl")
+
+# 8. حساب دقة النموذج على بيانات التدريب
+train_acc = model.score(X_train, y_train)
+
+print(f"\n🎯 دقة النموذج على بيانات التدريب: {train_acc * 100:.2f}%")
