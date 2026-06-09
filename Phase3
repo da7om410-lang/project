@@ -1,0 +1,113 @@
+# ==========================================
+# المرحلة الثالثة لتايتانيك: تقييم النموذج وحساب النتائج لبيانات كاجل
+# اسم الملف المرجعي: 02_evaluate.ipynb
+# ==========================================
+
+# استيراد المكتبات اللازمة
+import os  # للتعامل مع الملفات والمجلدات
+import time  # لقياس زمن التوقع
+import numpy as np  # للعمليات العددية
+import pandas as pd  # لقراءة ومعالجة البيانات
+import joblib  # لتحميل النموذج المحفوظ
+import matplotlib.pyplot as plt  # لرسم الرسومات
+from sklearn.metrics import classification_report, ConfusionMatrixDisplay  # للتقييم
+from sklearn.model_selection import train_test_split  # لتقسيم البيانات
+from sklearn.preprocessing import LabelEncoder  # لتحويل القيم النصية إلى رقمية
+
+# طباعة عنوان المرحلة
+print("==================================================")
+print("     المرحلة الثالثة لتايتانيك: التقييم والنتائج     ")
+print("==================================================")
+
+# 1. استدعاء النموذج المحفوظ من مجلد models
+model_path = "models/titanic_rf_model.pkl"
+
+# التحقق من وجود الملف قبل التحميل
+if not os.path.exists(model_path):
+    raise FileNotFoundError(f"خطأ: لم نجد ملف الموديل في {model_path}. شغّل خلية التدريب أولاً!")
+
+# تحميل النموذج من الملف
+model = joblib.load(model_path)
+print("[نجاح] تم تحميل نموذج التايتانيك المحفوظ وهو جاهز للاختبار.")
+
+# 2. قراءة بيانات Kaggle وتجهيزها بنفس طريقة التدريب
+df = pd.read_csv("train.csv")
+
+# تعويض القيم المفقودة في الأعمدة المهمة
+df['Age'].fillna(df['Age'].median(), inplace=True)
+df['Embarked'].fillna(df['Embarked'].mode()[0], inplace=True)
+df['Fare'].fillna(df['Fare'].median(), inplace=True)
+
+# تحويل القيم النصية إلى أرقام
+df['Sex'] = LabelEncoder().fit_transform(df['Sex'])
+df['Embarked'] = LabelEncoder().fit_transform(df['Embarked'])
+
+# تحديد الأعمدة المستخدمة في التدريب
+features = ['Pclass', 'Sex', 'Age', 'SibSp', 'Parch', 'Fare', 'Embarked']
+X = df[features]
+y = df['Survived']
+
+# إعادة تقسيم البيانات للحصول على نفس مجموعة الاختبار بنسبة 20%
+RANDOM_STATE = 42
+_, X_test, _, y_test = train_test_split(
+    X, y,
+    test_size=0.20,
+    random_state=RANDOM_STATE,
+    stratify=y
+)
+
+# 3. قياس سرعة التوقع ودقة النموذج
+print("\n[معلومات] جاري قياس سرعة التوقع والنتيجة الإجمالية...")
+
+# تسجيل وقت البداية
+start_time = time.time()
+
+# تنفيذ التوقعات على بيانات الاختبار
+y_pred = model.predict(X_test)
+
+# تسجيل وقت النهاية
+end_time = time.time()
+
+# حساب زمن التوقع لكل راكب بالملي ثانية
+latency_ms = ((end_time - start_time) / len(X_test)) * 1000
+
+# حساب دقة النموذج على بيانات الاختبار
+test_acc = model.score(X_test, y_test)
+
+print(f"🎯 دقة النموذج النهائية في الامتحان (Test Accuracy): {test_acc * 100:.2f}%")
+print(f"⚡ سرعة التوقع للراكب الواحد (Latency): {latency_ms:.2f} ملي ثانية")
+
+# 4. عرض تقرير الأداء التفصيلي
+print("\n📊 تقرير الأداء التفصيلي:")
+print("=" * 60)
+print(classification_report(y_test, y_pred, target_names=['Not Survived (0)', 'Survived (1)']))
+print("=" * 60)
+
+# 5. رسم مصفوفة اللخبطة وحفظها
+print("\n[معلومات] جاري رسم مصفوفة اللخبطة...")
+
+# إنشاء مجلد التقارير إذا لم يكن موجوداً
+os.makedirs("reports", exist_ok=True)
+
+# تجهيز الرسم
+fig, ax = plt.subplots(figsize=(6, 6))
+
+# رسم مصفوفة اللخبطة
+ConfusionMatrixDisplay.from_predictions(
+    y_test,
+    y_pred,
+    display_labels=['Not Survived', 'Survived'],
+    cmap=plt.cm.Reds,
+    ax=ax
+)
+
+# عنوان الرسم
+plt.title("Titanic Model - Confusion Matrix", fontsize=12, fontweight='bold')
+
+# حفظ الرسم كصورة عالية الجودة
+plt.savefig("reports/titanic_confusion_matrix.png", dpi=300)
+
+# عرض الرسم
+plt.show()
+
+print("[نجاح] تم حفظ صورة مصفوفة اللخبطة بنجاح في: reports/titanic_confusion_matrix.png")
